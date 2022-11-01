@@ -1,5 +1,22 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.openapi.service;
 
+import com.ctrip.framework.apollo.common.dto.PageDTO;
 import com.ctrip.framework.apollo.common.exception.BadRequestException;
 import com.ctrip.framework.apollo.openapi.entity.Consumer;
 import com.ctrip.framework.apollo.openapi.entity.ConsumerAudit;
@@ -12,6 +29,7 @@ import com.ctrip.framework.apollo.openapi.repository.ConsumerTokenRepository;
 import com.ctrip.framework.apollo.portal.component.config.PortalConfig;
 import com.ctrip.framework.apollo.portal.entity.bo.UserInfo;
 import com.ctrip.framework.apollo.portal.entity.po.Role;
+import com.ctrip.framework.apollo.portal.repository.RoleRepository;
 import com.ctrip.framework.apollo.portal.service.RolePermissionService;
 import com.ctrip.framework.apollo.portal.spi.UserInfoHolder;
 import com.ctrip.framework.apollo.portal.spi.UserService;
@@ -21,13 +39,18 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.hash.Hashing;
-import org.apache.commons.lang.time.FastDateFormat;
+import java.util.Objects;
+import org.apache.commons.lang3.time.FastDateFormat;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * @author Jason Song(song_s@ctrip.com)
@@ -46,6 +69,7 @@ public class ConsumerService {
   private final PortalConfig portalConfig;
   private final RolePermissionService rolePermissionService;
   private final UserService userService;
+  private final RoleRepository roleRepository;
 
   public ConsumerService(
       final UserInfoHolder userInfoHolder,
@@ -55,7 +79,8 @@ public class ConsumerService {
       final ConsumerRoleRepository consumerRoleRepository,
       final PortalConfig portalConfig,
       final RolePermissionService rolePermissionService,
-      final UserService userService) {
+      final UserService userService,
+      final RoleRepository roleRepository) {
     this.userInfoHolder = userInfoHolder;
     this.consumerTokenRepository = consumerTokenRepository;
     this.consumerRepository = consumerRepository;
@@ -64,6 +89,7 @@ public class ConsumerService {
     this.portalConfig = portalConfig;
     this.rolePermissionService = rolePermissionService;
     this.userService = userService;
+    this.roleRepository = roleRepository;
   }
 
 
@@ -78,7 +104,7 @@ public class ConsumerService {
     String ownerName = consumer.getOwnerName();
     UserInfo owner = userService.findByUserId(ownerName);
     if (owner == null) {
-      throw new BadRequestException(String.format("User does not exist. UserId = %s", ownerName));
+      throw new BadRequestException("User does not exist. UserId = %s", ownerName);
     }
     consumer.setOwnerEmail(owner.getEmail());
 
@@ -120,6 +146,7 @@ public class ConsumerService {
     return consumerRepository.findById(consumerId).orElse(null);
   }
 
+  @Transactional
   public List<ConsumerRole> assignNamespaceRoleToConsumer(String token, String appId, String namespaceName) {
     return assignNamespaceRoleToConsumer(token, appId, namespaceName, null);
   }
@@ -224,9 +251,9 @@ public class ConsumerService {
         .getDataChangeCreatedTime(), portalConfig.consumerTokenSalt()));
   }
 
-  String generateToken(String consumerAppId, Date generationTime, String
-      consumerTokenSalt) {
-    return Hashing.sha1().hashString(KEY_JOINER.join(consumerAppId, TIMESTAMP_FORMAT.format
+  @SuppressWarnings("UnstableApiUsage")
+  String generateToken(String consumerAppId, Date generationTime, String consumerTokenSalt) {
+    return Hashing.sha256().hashString(KEY_JOINER.join(consumerAppId, TIMESTAMP_FORMAT.format
         (generationTime), consumerTokenSalt), Charsets.UTF_8).toString();
   }
 
@@ -239,6 +266,56 @@ public class ConsumerService {
     consumerRole.setDataChangeLastModifiedBy(operator);
 
     return consumerRole;
+  }
+
+  public Set<String> findAppIdsAuthorizedByConsumerId(long consumerId) {
+    List<ConsumerRole> consumerRoles = this.findConsumerRolesByConsumerId(consumerId);
+    List<Long> roleIds = consumerRoles.stream().map(ConsumerRole::getRoleId)
+        .collect(Collectors.toList());
+
+    return this.findAppIdsByRoleIds(roleIds);
+  }
+
+  private List<ConsumerRole> findConsumerRolesByConsumerId(long consumerId) {
+    return this.consumerRoleRepository.findByConsumerId(consumerId);
+  }
+
+  private Set<String> findAppIdsByRoleIds(List<Long> roleIds) {
+    Iterable<Role> roleIterable = this.roleRepository.findAllById(roleIds);
+
+    Set<String> appIds = new HashSet<>();
+
+    roleIterable.forEach(role -> {
+      if (!role.isDeleted()) {
+        String roleName = role.getRoleName();
+        String appId = RoleUtils.extractAppIdFromRoleName(roleName);
+        appIds.add(appId);
+      }
+    });
+
+    return appIds;
+  }
+
+  public List<Consumer> findAllConsumer(Pageable page){
+    return this.consumerRepository.findAll(page).getContent();
+  }
+
+  @Transactional
+  public void deleteConsumer(String appId){
+    Consumer consumer = consumerRepository.findByAppId(appId);
+    if (consumer == null) {
+      throw new BadRequestException("ConsumerApp not exist");
+    }
+    long consumerId = consumer.getId();
+    List<ConsumerRole> consumerRoleList = consumerRoleRepository.findByConsumerId(consumerId);
+    ConsumerToken consumerToken = consumerTokenRepository.findByConsumerId(consumerId);
+
+    consumerRoleRepository.deleteAll(consumerRoleList);
+    consumerRepository.delete(consumer);
+
+    if (Objects.nonNull(consumerToken)) {
+      consumerTokenRepository.delete(consumerToken);
+    }
   }
 
 }

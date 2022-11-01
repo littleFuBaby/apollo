@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.portal.service;
 
 import com.ctrip.framework.apollo.common.entity.App;
@@ -9,15 +25,15 @@ import com.ctrip.framework.apollo.core.utils.StringUtils;
 import com.ctrip.framework.apollo.portal.repository.AppNamespaceRepository;
 import com.ctrip.framework.apollo.portal.spi.UserInfoHolder;
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
 
 @Service
 public class AppNamespaceService {
@@ -73,10 +89,15 @@ public class AppNamespaceService {
     return appNamespaceRepository.findByAppId(appId);
   }
 
+  public List<AppNamespace> findAll() {
+    Iterable<AppNamespace> appNamespaces = appNamespaceRepository.findAll();
+    return Lists.newArrayList(appNamespaces);
+  }
+
   @Transactional
   public void createDefaultAppNamespace(String appId) {
     if (!isAppNamespaceNameUnique(appId, ConfigConsts.NAMESPACE_APPLICATION)) {
-      throw new BadRequestException(String.format("App already has application namespace. AppId = %s", appId));
+      throw new BadRequestException("App already has application namespace. AppId = %s", appId);
     }
 
     AppNamespace appNs = new AppNamespace();
@@ -97,6 +118,7 @@ public class AppNamespaceService {
     return Objects.isNull(appNamespaceRepository.findByAppIdAndName(appId, namespaceName));
   }
 
+  @Transactional
   public AppNamespace createAppNamespaceInLocal(AppNamespace appNamespace) {
     return createAppNamespaceInLocal(appNamespace, true);
   }
@@ -109,11 +131,6 @@ public class AppNamespaceService {
     App app = appService.load(appId);
     if (app == null) {
       throw new BadRequestException("App not exist. AppId = " + appId);
-    }
-
-    // public namespaces only allow properties format
-    if (appNamespace.isPublic()) {
-      appNamespace.setFormat(ConfigFileFormat.Properties.getValue());
     }
 
     StringBuilder appNamespaceName = new StringBuilder();
@@ -153,6 +170,30 @@ public class AppNamespaceService {
     }
 
     AppNamespace createdAppNamespace = appNamespaceRepository.save(appNamespace);
+
+    roleInitializationService.initNamespaceRoles(appNamespace.getAppId(), appNamespace.getName(), operator);
+    roleInitializationService.initNamespaceEnvRoles(appNamespace.getAppId(), appNamespace.getName(), operator);
+
+    return createdAppNamespace;
+  }
+
+  @Transactional
+  public AppNamespace importAppNamespaceInLocal(AppNamespace appNamespace) {
+    // globally uniqueness check for public app namespace
+    if (appNamespace.isPublic()) {
+      checkAppNamespaceGlobalUniqueness(appNamespace);
+    } else {
+      // check private app namespace
+      if (appNamespaceRepository.findByAppIdAndName(appNamespace.getAppId(), appNamespace.getName()) != null) {
+        throw new BadRequestException("Private AppNamespace " + appNamespace.getName() + " already exists!");
+      }
+      // should not have the same with public app namespace
+      checkPublicAppNamespaceGlobalUniqueness(appNamespace);
+    }
+
+    AppNamespace createdAppNamespace = appNamespaceRepository.save(appNamespace);
+
+    String operator = appNamespace.getDataChangeCreatedBy();
 
     roleInitializationService.initNamespaceRoles(appNamespace.getAppId(), appNamespace.getName(), operator);
     roleInitializationService.initNamespaceEnvRoles(appNamespace.getAppId(), appNamespace.getName(), operator);
@@ -213,4 +254,5 @@ public class AppNamespaceService {
   public void batchDeleteByAppId(String appId, String operator) {
     appNamespaceRepository.batchDeleteByAppId(appId, operator);
   }
+
 }

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.portal.controller;
 
 import com.ctrip.framework.apollo.common.dto.NamespaceDTO;
@@ -10,6 +26,7 @@ import com.ctrip.framework.apollo.openapi.service.ConsumerService;
 import com.ctrip.framework.apollo.portal.environment.Env;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +71,8 @@ public class ConsumerController {
     return consumerService.generateAndSaveConsumerToken(createdConsumer, expires);
   }
 
-  @GetMapping(value = "/consumers/by-appId")
+  @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
+  @GetMapping(value = "/consumer-tokens/by-appId")
   public ConsumerToken getConsumerTokenByAppId(@RequestParam String appId) {
     return consumerService.getConsumerTokenByAppId(appId);
   }
@@ -87,7 +105,7 @@ public class ConsumerController {
           continue;
         }
         if (Env.UNKNOWN.equals(Env.transformEnv(env))) {
-          throw new BadRequestException(String.format("env: %s is illegal", env));
+          throw new BadRequestException("env: %s is illegal", env);
         }
         envList.add(env);
       }
@@ -102,6 +120,16 @@ public class ConsumerController {
     return consumerService.assignNamespaceRoleToConsumer(token, appId, namespaceName);
   }
 
+  @GetMapping("/consumers")
+  @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
+  public List<Consumer> getConsumerList(Pageable page){
+    return consumerService.findAllConsumer(page);
+  }
 
+  @DeleteMapping(value = "/consumers/by-appId")
+  @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
+  public void deleteConsumers(@RequestParam String appId) {
+    consumerService.deleteConsumer(appId);
+  }
 
 }

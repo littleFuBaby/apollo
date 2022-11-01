@@ -44,7 +44,8 @@ Namespace类型有三种：
   * 私有类型
   * 公共类型  
   * 关联类型（继承类型）
-  
+
+
 #### 5.1 私有类型
 私有类型的Namespace具有private权限。例如上文提到的“application” Namespace就是私有类型。
 
@@ -60,7 +61,7 @@ Namespace类型有三种：
   * 小组级别共享的配置
   * 几个项目之间共享的配置
   * 中间件客户端的配置
-  
+
 
 #### 5.3 关联类型
 
@@ -94,7 +95,7 @@ k2 = v2
  * 应用B有一个私有类型的Namespace：application，以及一个公共类型的Namespace：NS-Public。
  * 应用C只有一个私有类型的Namespace：application
  
-![Namespace例子](https://raw.githubusercontent.com/ctripcorp/apollo/master/doc/images/namespace-model-example.png)
+![Namespace例子](https://cdn.jsdelivr.net/gh/apolloconfig/apollo@master/doc/images/namespace-model-example.png)
 
 ##### 5.4.1 应用A获取Apollo配置
 ```java

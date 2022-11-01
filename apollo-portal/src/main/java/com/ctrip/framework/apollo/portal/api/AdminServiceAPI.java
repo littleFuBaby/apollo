@@ -1,8 +1,27 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.portal.api;
 
 import com.ctrip.framework.apollo.common.dto.*;
+import com.ctrip.framework.apollo.openapi.dto.OpenItemDTO;
 import com.ctrip.framework.apollo.portal.environment.Env;
 import com.google.common.base.Joiner;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -13,8 +32,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 @Service
@@ -52,6 +74,10 @@ public class AdminServiceAPI {
   @Service
   public static class NamespaceAPI extends API {
 
+    private ParameterizedTypeReference<PageDTO<NamespaceDTO>>
+        namespacePageDTO = new ParameterizedTypeReference<PageDTO<NamespaceDTO>>() {
+    };
+
     private ParameterizedTypeReference<Map<String, Boolean>>
         typeReference = new ParameterizedTypeReference<Map<String, Boolean>>() {
     };
@@ -61,6 +87,14 @@ public class AdminServiceAPI {
           NamespaceDTO[].class, appId,
           clusterName);
       return Arrays.asList(namespaceDTOs);
+    }
+
+    public PageDTO<NamespaceDTO> findByItem(Env env, String itemKey, int page, int size) {
+      ResponseEntity<PageDTO<NamespaceDTO>>
+          entity =
+          restTemplate.get(env, "/namespaces/find-by-item?itemKey={itemKey}&page={page}&size={size}",
+                           namespacePageDTO, itemKey, page, size);
+      return entity.getBody();
     }
 
     public NamespaceDTO loadNamespace(String appId, Env env, String clusterName,
@@ -136,6 +170,9 @@ public class AdminServiceAPI {
   @Service
   public static class ItemAPI extends API {
 
+    private final ParameterizedTypeReference<PageDTO<OpenItemDTO>> openItemPageDTO =
+            new ParameterizedTypeReference<PageDTO<OpenItemDTO>>() {};
+
     public List<ItemDTO> findItems(String appId, Env env, String clusterName, String namespaceName) {
       ItemDTO[] itemDTOs =
           restTemplate.get(env, "apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/items",
@@ -153,6 +190,13 @@ public class AdminServiceAPI {
     public ItemDTO loadItem(Env env, String appId, String clusterName, String namespaceName, String key) {
       return restTemplate.get(env, "apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/items/{key}",
           ItemDTO.class, appId, clusterName, namespaceName, key);
+    }
+
+    public ItemDTO loadItemByEncodeKey(Env env, String appId, String clusterName, String namespaceName, String key) {
+      return restTemplate.get(env,
+          "apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/encodedItems/{key}",
+          ItemDTO.class, appId, clusterName, namespaceName,
+          new String(Base64.getEncoder().encode(key.getBytes(StandardCharsets.UTF_8))));
     }
 
     public ItemDTO loadItemById(Env env, long itemId) {
@@ -176,9 +220,22 @@ public class AdminServiceAPI {
           item, ItemDTO.class, appId, clusterName, namespace);
     }
 
+    public ItemDTO createCommentItem(String appId, Env env, String clusterName, String namespace, ItemDTO item) {
+      return restTemplate.post(env, "apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/comment_items",
+                               item, ItemDTO.class, appId, clusterName, namespace);
+    }
+
     public void deleteItem(Env env, long itemId, String operator) {
 
       restTemplate.delete(env, "items/{itemId}?operator={operator}", itemId, operator);
+    }
+
+    public PageDTO<OpenItemDTO> findItemsByNamespace(String appId, Env env, String clusterName,
+                                                     String namespaceName, int page, int size) {
+      ResponseEntity<PageDTO<OpenItemDTO>> entity = restTemplate.get(env,
+              "/apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/items-with-page?page={page}&size={size}",
+                      openItemPageDTO, appId, clusterName, namespaceName, page, size);
+      return entity.getBody();
     }
   }
 
@@ -364,6 +421,16 @@ public class AdminServiceAPI {
           "apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/commit?page={page}&size={size}",
           CommitDTO[].class,
           appId, clusterName, namespaceName, page, size);
+
+      return Arrays.asList(commitDTOs);
+    }
+
+    public List<CommitDTO> findByKey(String appId, Env env, String clusterName, String namespaceName, String key, int page, int size) {
+
+      CommitDTO[] commitDTOs = restTemplate.get(env,
+              "apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/commit?key={key}&page={page}&size={size}",
+              CommitDTO[].class,
+              appId, clusterName, namespaceName, key, page, size);
 
       return Arrays.asList(commitDTOs);
     }

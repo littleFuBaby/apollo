@@ -1,5 +1,22 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.configservice.filter;
 
+import com.ctrip.framework.apollo.biz.config.BizConfig;
 import com.ctrip.framework.apollo.configservice.util.AccessKeyUtil;
 import com.ctrip.framework.apollo.core.signature.Signature;
 import com.ctrip.framework.apollo.core.utils.StringUtils;
@@ -26,16 +43,16 @@ public class ClientAuthenticationFilter implements Filter {
 
   private static final Logger logger = LoggerFactory.getLogger(ClientAuthenticationFilter.class);
 
-  private static final Long TIMESTAMP_INTERVAL = 60 * 1000L;
-
+  private final BizConfig bizConfig;
   private final AccessKeyUtil accessKeyUtil;
 
-  public ClientAuthenticationFilter(AccessKeyUtil accessKeyUtil) {
+  public ClientAuthenticationFilter(BizConfig bizConfig, AccessKeyUtil accessKeyUtil) {
+    this.bizConfig = bizConfig;
     this.accessKeyUtil = accessKeyUtil;
   }
 
   @Override
-  public void init(FilterConfig filterConfig) throws ServletException {
+  public void init(FilterConfig filterConfig) {
     //nothing
   }
 
@@ -90,7 +107,8 @@ public class ClientAuthenticationFilter implements Filter {
     }
 
     long x = System.currentTimeMillis() - requestTimeMillis;
-    return x >= -TIMESTAMP_INTERVAL && x <= TIMESTAMP_INTERVAL;
+    long authTimeDiffToleranceInMillis = bizConfig.accessKeyAuthTimeDiffTolerance() * 1000L;
+    return Math.abs(x) < authTimeDiffToleranceInMillis;
   }
 
   private boolean checkAuthorization(String authorization, List<String> availableSecrets,

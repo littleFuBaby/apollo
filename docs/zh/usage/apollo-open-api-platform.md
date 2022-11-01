@@ -13,22 +13,31 @@ Apollo提供了一套的Http REST接口，使第三方应用能够自己管理�
 * 第三方应用的AppId、应用名、部门
 * 第三方应用负责人
 
-Apollo管理员在 http://{portal_address}/open/manage.html 创建第三方应用，创建之前最好先查询此AppId是否已经创建。创建成功之后会生成一个token，如下图所示：
+Apollo管理员在 `http://{portal_address}/open/add-consumer.html` 创建第三方应用，创建之前最好先查询此AppId是否已经创建。创建成功之后会生成一个token，如下图所示：
 
-![开放平台管理](https://raw.githubusercontent.com/ctripcorp/apollo/master/doc/images/apollo-open-manage.png)
+![开放平台管理](https://cdn.jsdelivr.net/gh/apolloconfig/apollo@master/doc/images/apollo-open-manage.png)
 
-#### 2.2 给已注册的第三方应用授权
-第三方应用不应该能操作任何Namespace的配置，所以需要给token绑定可以操作的Namespace。Apollo管理员在 http://{portal_address}/open/manage.html 页面给token赋权。赋权之后，第三方应用就可以通过Apollo提供的Http REST接口来管理已授权的Namespace的配置了。
+#### 2.2 查看第三方应用
+Apollo管理员在 `http://{portal_address}/open/manage.html` 页面可以查看第三方应用列表。并提供了【查看Token并赋权】、【删除】等管理操作，如下图所示：
 
-#### 2.3 第三方应用调用Apollo Open API
+![第三方应用列表](https://cdn.jsdelivr.net/gh/apolloconfig/apollo@master/doc/images/apollo-open-manage-list.png)
 
-##### 2.3.1 调用Http REST接口
+【查看Token并赋权】的模态框页面如下图所示：
+
+![查看Token并赋权](https://cdn.jsdelivr.net/gh/apolloconfig/apollo@master/doc/images/apollo-open-manage-token.png)
+
+#### 2.3 给已注册的第三方应用授权
+第三方应用不应该能操作任何Namespace的配置，所以需要给token绑定可以操作的Namespace。Apollo管理员在 `http://{portal_address}/open/add-consumer.html` 页面给token赋权。赋权之后，第三方应用就可以通过Apollo提供的Http REST接口来管理已授权的Namespace的配置了。
+
+#### 2.4 第三方应用调用Apollo Open API
+
+##### 2.4.1 调用Http REST接口
 任何语言的第三方应用都可以调用Apollo的Open API，在调用接口时，需要设置注意以下两点：
  * Http Header中增加一个Authorization字段，字段值为申请的token
  * Http Header的Content-Type字段需要设置成application/json;charset=UTF-8
- 
-##### 2.3.2 Java应用通过apollo-openapi调用Apollo Open API
-从1.1.0版本开始，Apollo提供了[apollo-openapi](https://github.com/ctripcorp/apollo/tree/master/apollo-openapi)客户端，所以Java语言的第三方应用可以更方便地调用Apollo Open API。
+
+##### 2.4.2 Java应用通过apollo-openapi调用Apollo Open API
+从1.1.0版本开始，Apollo提供了[apollo-openapi](https://github.com/apolloconfig/apollo/tree/master/apollo-openapi)客户端，所以Java语言的第三方应用可以更方便地调用Apollo Open API。
 
 首先引入`apollo-openapi`依赖：
 ```xml
@@ -51,22 +60,48 @@ ApolloOpenApiClient client = ApolloOpenApiClient.newBuilder()
 
 后续就可以通过`ApolloOpenApiClient`的接口直接操作Apollo Open API了，接口说明参见下面的Rest接口文档。
 
-##### 2.3.3 .Net core应用调用Apollo Open API
+##### 2.4.3 .Net core应用调用Apollo Open API
 
 .Net core也提供了open api的客户端，详见https://github.com/ctripcorp/apollo.net/pull/77
+
+##### 2.4.4 Shell Scripts调用Apollo Open API
+
+封装了bash的function，底层使用curl来发送HTTP请求
+
+* bash函数：[openapi.sh](https://github.com/apolloconfig/apollo/blob/master/scripts/openapi/bash/openapi.sh)
+
+* 使用示例：[openapi-usage-example.sh](https://github.com/apolloconfig/apollo/blob/master/scripts/openapi/bash/openapi-usage-example.sh)
+* 全部和openapi有关的shell脚本在文件夹 https://github.com/apolloconfig/apollo/tree/master/scripts/sql 下
 
 ### 三、 接口文档
 
 #### 3.1 URL路径参数说明
-  
+
 参数名 | 参数说明
 --- | ---
 env | 所管理的配置环境
 appId | 所管理的配置AppId
 clusterName | 所管理的配置集群名， 一般情况下传入 default 即可。如果是特殊集群，传入相应集群的名称即可
 namespaceName | 所管理的Namespace的名称，如果是非properties格式，需要加上后缀名，如`sample.yml`
-  
+
 #### 3.2 API接口列表
+
+- [3.2.1 获取 App 的环境，集群信息](#_321-获取app的环境，集群信息)
+- [3.2.2 获取 App 信息](#_322-获取app信息)
+- [3.2.3 获取集群详细信息](#_323-获取集群接口)
+- [3.2.4 创建集群](#_324-创建集群接口)
+- [3.2.5 获取集群下所有 Namespace 信息](#_325-获取集群下所有namespace信息接口)
+- [3.2.6 获取 Namespace 信息](#_326-获取某个namespace信息接口)
+- [3.2.7 创建 Namespace](#_327-创建namespace)
+- [3.2.8 获取 Namespace 当前编辑人](#_328-获取某个namespace当前编辑人接口)
+- [3.2.9 获取具体配置项](#_329-读取配置接口)
+- [3.2.10 新增配置项](#_3210-新增配置接口)
+- [3.2.11 修改配置项](#_3211-修改配置接口)
+- [3.2.12 删除配置项](#_3212-删除配置接口)
+- [3.2.13 发布 Namespace](#_3213-发布配置接口)
+- [3.2.14 获取 Namespace 最后一次发布的内容](#_3214-获取某个namespace当前生效的已发布配置接口)
+- [3.2.15 回滚 Namespace](#_3215-回滚已发布配置接口)
+- [3.2.16 分页获取配置项](#_3216-分页获取配置项接口) 
 
 ##### 3.2.1 获取App的环境，集群信息
 
@@ -379,7 +414,7 @@ Apollo在生产环境（PRO）有限制规则：每次发布只能有一个人�
 ---- | --- | --- | ---
 key | true | String | 配置的key，长度不能超过128个字符。非properties格式，key固定为`content`
 value |	true | String | 配置的value，长度不能超过20000个字符，非properties格式，value为文件全部内容
-comment	| false | String | 配置的备注,长度不能超过1024个字符
+comment	| false | String | 配置的备注,长度不能超过256个字符
 dataChangeCreatedBy | true | String | item的创建人，格式为域账号，也就是sso系统的User ID
 
 * **Request body sample** :
@@ -424,7 +459,7 @@ createIfNotExists | false | Boolean | 当配置不存在时是否自动创建
 ---- | --- | --- | ---
 key | true | String | 配置的key，需和url中的key值一致。非properties格式，key固定为`content`
 value |	true | String | 配置的value，长度不能超过20000个字符，非properties格式，value为文件全部内容
-comment	| false | String | 配置的备注,长度不能超过1024个字符
+comment	| false | String | 配置的备注,长度不能超过256个字符
 dataChangeLastModifiedBy | true | String | item的修改人，格式为域账号，也就是sso系统的User ID
 dataChangeCreatedBy | false | String | 当createIfNotExists为true时必选。item的创建人，格式为域账号，也就是sso系统的User ID
 
@@ -532,6 +567,48 @@ operator | true | String | 删除配置的操作者，域账号
 
 * **返回值** ： 无
 
+##### 3.2.16 分页获取配置项接口
+
+* **URL** ：  http://{portal_address}/openapi/v1/envs/{env}/apps/{appId}/clusters/{clusterName}/namespaces/{namespaceName}/items
+* **Method** ： GET
+* **Version** ： >= 2.1.0
+* **Request Params** ：
+
+参数名 | 必选    | 类型  | 说明
+--- |-------|-----| ---
+page | false | int | 页码，从 0 开始，默认为 0
+size | false | int | 页大小，默认为 50
+
+* **返回值Sample** ：
+
+``` json
+{
+    "content": [
+        {
+            "key": "timeout",
+            "value": "3000",
+            "comment": "超时时间",
+            "dataChangeCreatedBy": "mghio",
+            "dataChangeLastModifiedBy": "mghio",
+            "dataChangeCreatedTime": "2022-07-17T21:37:41.818+0800",
+            "dataChangeLastModifiedTime": "2022-07-17T21:37:41.818+0800"
+        },
+        {
+            "key": "page.size",
+            "value": "200",
+            "comment": "页大小",
+            "dataChangeCreatedBy": "mghio",
+            "dataChangeLastModifiedBy": "mghio",
+            "dataChangeCreatedTime": "2022-07-17T21:37:41.818+0800",
+            "dataChangeLastModifiedTime": "2022-07-17T21:37:41.818+0800"
+        }
+    ],
+    "page": 0,
+    "size": 50,
+    "total": 2
+}
+```
+
 ### 四、错误码说明
 
 正常情况下，接口返回的Http状态码是200，下面列举了Apollo会返回的非200错误码说明。
@@ -548,5 +625,4 @@ operator | true | String | 删除配置的操作者，域账号
 接口访问的Method不正确，比如应该使用POST的接口使用了GET访问等，客户端需要检查接口访问方式是否正确。
 ####  4.6 500 - Internal Server Error
 其它类型的错误默认都会返回500，对这类错误如果应用无法根据提示信息找到原因的话，可以找Apollo研发团队一起排查问题。
-
 

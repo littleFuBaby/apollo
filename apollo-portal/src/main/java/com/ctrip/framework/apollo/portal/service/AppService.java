@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.portal.service;
 
 import com.ctrip.framework.apollo.common.dto.AppDTO;
@@ -5,6 +21,7 @@ import com.ctrip.framework.apollo.common.dto.PageDTO;
 import com.ctrip.framework.apollo.common.entity.App;
 import com.ctrip.framework.apollo.common.exception.BadRequestException;
 import com.ctrip.framework.apollo.common.utils.BeanUtils;
+import com.ctrip.framework.apollo.core.utils.StringUtils;
 import com.ctrip.framework.apollo.portal.environment.Env;
 import com.ctrip.framework.apollo.portal.api.AdminServiceAPI;
 import com.ctrip.framework.apollo.portal.constant.TracerEventType;
@@ -20,7 +37,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -61,10 +77,8 @@ public class AppService {
 
   public List<App> findAll() {
     Iterable<App> apps = appRepository.findAll();
-    if (apps == null) {
-      return Collections.emptyList();
-    }
-    return Lists.newArrayList((apps));
+
+    return Lists.newArrayList(apps);
   }
 
   public PageDTO<App> findAll(Pageable pageable) {
@@ -100,9 +114,11 @@ public class AppService {
   }
 
   public void createAppInRemote(Env env, App app) {
-    String username = userInfoHolder.getUser().getUserId();
-    app.setDataChangeCreatedBy(username);
-    app.setDataChangeLastModifiedBy(username);
+    if (StringUtils.isBlank(app.getDataChangeCreatedBy())) {
+      String username = userInfoHolder.getUser().getUserId();
+      app.setDataChangeCreatedBy(username);
+      app.setDataChangeLastModifiedBy(username);
+    }
 
     AppDTO appDTO = BeanUtils.transform(AppDTO.class, app);
     appAPI.createApp(env, appDTO);
@@ -114,7 +130,7 @@ public class AppService {
     App managedApp = appRepository.findByAppId(appId);
 
     if (managedApp != null) {
-      throw new BadRequestException(String.format("App already exists. AppId = %s", appId));
+      throw new BadRequestException("App already exists. AppId = %s", appId);
     }
 
     UserInfo owner = userService.findByUserId(app.getOwnerName());
@@ -138,12 +154,31 @@ public class AppService {
   }
 
   @Transactional
+  public App importAppInLocal(App app) {
+    String appId = app.getAppId();
+    App managedApp = appRepository.findByAppId(appId);
+
+    if (managedApp != null) {
+      return app;
+    }
+
+    app.setId(0);
+    App createdApp = appRepository.save(app);
+
+    roleInitializationService.initAppRoles(createdApp);
+
+    Tracer.logEvent(TracerEventType.CREATE_APP, appId);
+
+    return createdApp;
+  }
+
+  @Transactional
   public App updateAppInLocal(App app) {
     String appId = app.getAppId();
 
     App managedApp = appRepository.findByAppId(appId);
     if (managedApp == null) {
-      throw new BadRequestException(String.format("App not exists. AppId = %s", appId));
+      throw new BadRequestException("App not exists. AppId = %s", appId);
     }
 
     managedApp.setName(app.getName());
@@ -153,7 +188,7 @@ public class AppService {
     String ownerName = app.getOwnerName();
     UserInfo owner = userService.findByUserId(ownerName);
     if (owner == null) {
-      throw new BadRequestException(String.format("App's owner not exists. owner = %s", ownerName));
+      throw new BadRequestException("App's owner not exists. owner = %s", ownerName);
     }
     managedApp.setOwnerName(owner.getUserId());
     managedApp.setOwnerEmail(owner.getEmail());
@@ -174,7 +209,7 @@ public class AppService {
   public App deleteAppInLocal(String appId) {
     App managedApp = appRepository.findByAppId(appId);
     if (managedApp == null) {
-      throw new BadRequestException(String.format("App not exists. AppId = %s", appId));
+      throw new BadRequestException("App not exists. AppId = %s", appId);
     }
     String operator = userInfoHolder.getUser().getUserId();
 

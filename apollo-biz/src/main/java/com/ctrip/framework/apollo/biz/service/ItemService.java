@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.biz.service;
 
 
@@ -10,7 +26,10 @@ import com.ctrip.framework.apollo.common.exception.BadRequestException;
 import com.ctrip.framework.apollo.common.exception.NotFoundException;
 import com.ctrip.framework.apollo.common.utils.BeanUtils;
 import com.ctrip.framework.apollo.core.utils.StringUtils;
+
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,20 +80,12 @@ public class ItemService {
   }
 
   public Item findOne(String appId, String clusterName, String namespaceName, String key) {
-    Namespace namespace = namespaceService.findOne(appId, clusterName, namespaceName);
-    if (namespace == null) {
-      throw new NotFoundException(
-          String.format("namespace not found for %s %s %s", appId, clusterName, namespaceName));
-    }
+    Namespace namespace = findNamespaceByAppIdAndClusterNameAndNamespaceName(appId, clusterName, namespaceName);
     return itemRepository.findByNamespaceIdAndKey(namespace.getId(), key);
   }
 
   public Item findLastOne(String appId, String clusterName, String namespaceName) {
-    Namespace namespace = namespaceService.findOne(appId, clusterName, namespaceName);
-    if (namespace == null) {
-      throw new NotFoundException(
-          String.format("namespace not found for %s %s %s", appId, clusterName, namespaceName));
-    }
+    Namespace namespace = findNamespaceByAppIdAndClusterNameAndNamespaceName(appId, clusterName, namespaceName);
     return findLastOne(namespace.getId());
   }
 
@@ -122,9 +133,19 @@ public class ItemService {
     return itemRepository.findByNamespaceIdAndDataChangeLastModifiedTimeGreaterThan(namespaceId, date);
   }
 
+  public Page<Item> findItemsByKey(String key, Pageable pageable) {
+    return itemRepository.findByKey(key, pageable);
+  }
+
+  public Page<Item> findItemsByNamespace(String appId, String clusterName, String namespaceName, Pageable pageable) {
+    Namespace namespace = findNamespaceByAppIdAndClusterNameAndNamespaceName(appId, clusterName, namespaceName);
+    return itemRepository.findByNamespaceId(namespace.getId(), pageable);
+  }
+
   @Transactional
   public Item save(Item entity) {
     checkItemKeyLength(entity.getKey());
+    checkItemType(entity.getType());
     checkItemValueLength(entity.getNamespaceId(), entity.getValue());
 
     entity.setId(0);//protection
@@ -144,7 +165,28 @@ public class ItemService {
   }
 
   @Transactional
+  public Item saveComment(Item entity) {
+    entity.setKey("");
+    entity.setValue("");
+    entity.setId(0);//protection
+
+    if (entity.getLineNum() == 0) {
+      Item lastItem = findLastOne(entity.getNamespaceId());
+      int lineNum = lastItem == null ? 1 : lastItem.getLineNum() + 1;
+      entity.setLineNum(lineNum);
+    }
+
+    Item item = itemRepository.save(entity);
+
+    auditService.audit(Item.class.getSimpleName(), item.getId(), Audit.OP.INSERT,
+                       item.getDataChangeCreatedBy());
+
+    return item;
+  }
+
+  @Transactional
   public Item update(Item item) {
+    checkItemType(item.getType());
     checkItemValueLength(item.getNamespaceId(), item.getValue());
     Item managedItem = itemRepository.findById(item.getId()).orElse(null);
     BeanUtils.copyEntityProperties(item, managedItem);
@@ -171,12 +213,30 @@ public class ItemService {
     return true;
   }
 
+  private boolean checkItemType(int type) {
+    if (type < 0 || type > 3) {
+      throw new BadRequestException("type is invalid. type should be in [0, 3]. ");
+    }
+    return true;
+  }
+
   private int getItemValueLengthLimit(long namespaceId) {
     Map<Long, Integer> namespaceValueLengthOverride = bizConfig.namespaceValueLengthLimitOverride();
     if (namespaceValueLengthOverride != null && namespaceValueLengthOverride.containsKey(namespaceId)) {
       return namespaceValueLengthOverride.get(namespaceId);
     }
     return bizConfig.itemValueLengthLimit();
+  }
+
+  private Namespace findNamespaceByAppIdAndClusterNameAndNamespaceName(String appId,
+                                                                       String clusterName,
+                                                                       String namespaceName) {
+    Namespace namespace = namespaceService.findOne(appId, clusterName, namespaceName);
+    if (namespace == null) {
+      throw new NotFoundException("namespace not found for appId:%s clusterName:%s namespaceName:%s",
+              appId, clusterName, namespaceName);
+    }
+    return namespace;
   }
 
 }

@@ -1,10 +1,28 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.portal.controller;
 
 
 import com.ctrip.framework.apollo.common.utils.BeanUtils;
 import com.ctrip.framework.apollo.portal.entity.po.ServerConfig;
 import com.ctrip.framework.apollo.portal.repository.ServerConfigRepository;
+import com.ctrip.framework.apollo.portal.service.ServerConfigService;
 import com.ctrip.framework.apollo.portal.spi.UserInfoHolder;
+import java.util.List;
 import java.util.Objects;
 import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,10 +40,12 @@ public class ServerConfigController {
 
   private final ServerConfigRepository serverConfigRepository;
   private final UserInfoHolder userInfoHolder;
+  private final ServerConfigService serverConfigService;
 
-  public ServerConfigController(final ServerConfigRepository serverConfigRepository, final UserInfoHolder userInfoHolder) {
+  public ServerConfigController(final ServerConfigRepository serverConfigRepository, final UserInfoHolder userInfoHolder, final ServerConfigService serverConfigService) {
     this.serverConfigRepository = serverConfigRepository;
     this.userInfoHolder = userInfoHolder;
+    this.serverConfigService = serverConfigService;
   }
 
   @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
@@ -45,6 +65,12 @@ public class ServerConfigController {
     BeanUtils.copyEntityProperties(serverConfig, storedConfig);
     storedConfig.setDataChangeLastModifiedBy(modifiedBy);
     return serverConfigRepository.save(storedConfig);
+  }
+
+  @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")
+  @GetMapping("/server/config/find-all-config")
+  public List<ServerConfig> findAllServerConfig() {
+    return serverConfigService.findAll();
   }
 
   @PreAuthorize(value = "@permissionValidator.isSuperAdmin()")

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.biz.config;
 
 import com.ctrip.framework.apollo.biz.service.BizDBPropertySource;
@@ -22,8 +38,9 @@ public class BizConfig extends RefreshableConfig {
   private static final int DEFAULT_APPNAMESPACE_CACHE_REBUILD_INTERVAL = 60; //60s
   private static final int DEFAULT_GRAY_RELEASE_RULE_SCAN_INTERVAL = 60; //60s
   private static final int DEFAULT_APPNAMESPACE_CACHE_SCAN_INTERVAL = 1; //1s
-  private static final int DEFAULT_ACCESSKEY_CACHE_SCAN_INTERVAL = 1; //1s
-  private static final int DEFAULT_ACCESSKEY_CACHE_REBUILD_INTERVAL = 60; //60s
+  private static final int DEFAULT_ACCESS_KEY_CACHE_SCAN_INTERVAL = 1; //1s
+  private static final int DEFAULT_ACCESS_KEY_CACHE_REBUILD_INTERVAL = 60; //60s
+  private static final int DEFAULT_ACCESS_KEY_AUTH_TIME_DIFF_TOLERANCE = 60; //60s
   private static final int DEFAULT_RELEASE_MESSAGE_CACHE_SCAN_INTERVAL = 1; //1s
   private static final int DEFAULT_RELEASE_MESSAGE_SCAN_INTERVAL_IN_MS = 1000; //1000ms
   private static final int DEFAULT_RELEASE_MESSAGE_NOTIFICATION_BATCH = 100;
@@ -92,17 +109,6 @@ public class BizConfig extends RefreshableConfig {
     return !getBooleanProperty("namespace.lock.switch", false);
   }
 
-  /**
-   * ctrip config
-   **/
-  public String cloggingUrl() {
-    return getValue("clogging.server.url");
-  }
-
-  public String cloggingPort() {
-    return getValue("clogging.server.port");
-  }
-
   public int appNamespaceCacheScanInterval() {
     int interval = getIntProperty("apollo.app-namespace-cache-scan.interval", DEFAULT_APPNAMESPACE_CACHE_SCAN_INTERVAL);
     return checkInt(interval, 1, Integer.MAX_VALUE, DEFAULT_APPNAMESPACE_CACHE_SCAN_INTERVAL);
@@ -122,8 +128,9 @@ public class BizConfig extends RefreshableConfig {
   }
 
   public int accessKeyCacheScanInterval() {
-    int interval = getIntProperty("apollo.access-key-cache-scan.interval", DEFAULT_ACCESSKEY_CACHE_SCAN_INTERVAL);
-    return checkInt(interval, 1, Integer.MAX_VALUE, DEFAULT_ACCESSKEY_CACHE_SCAN_INTERVAL);
+    int interval = getIntProperty("apollo.access-key-cache-scan.interval",
+        DEFAULT_ACCESS_KEY_CACHE_SCAN_INTERVAL);
+    return checkInt(interval, 1, Integer.MAX_VALUE, DEFAULT_ACCESS_KEY_CACHE_SCAN_INTERVAL);
   }
 
   public TimeUnit accessKeyCacheScanIntervalTimeUnit() {
@@ -131,12 +138,20 @@ public class BizConfig extends RefreshableConfig {
   }
 
   public int accessKeyCacheRebuildInterval() {
-    int interval = getIntProperty("apollo.access-key-cache-rebuild.interval", DEFAULT_ACCESSKEY_CACHE_REBUILD_INTERVAL);
-    return checkInt(interval, 1, Integer.MAX_VALUE, DEFAULT_ACCESSKEY_CACHE_REBUILD_INTERVAL);
+    int interval = getIntProperty("apollo.access-key-cache-rebuild.interval",
+        DEFAULT_ACCESS_KEY_CACHE_REBUILD_INTERVAL);
+    return checkInt(interval, 1, Integer.MAX_VALUE, DEFAULT_ACCESS_KEY_CACHE_REBUILD_INTERVAL);
   }
 
   public TimeUnit accessKeyCacheRebuildIntervalTimeUnit() {
     return TimeUnit.SECONDS;
+  }
+
+  public int accessKeyAuthTimeDiffTolerance() {
+    int authTimeDiffTolerance = getIntProperty("apollo.access-key.auth-time-diff-tolerance",
+        DEFAULT_ACCESS_KEY_AUTH_TIME_DIFF_TOLERANCE);
+    return checkInt(authTimeDiffTolerance, 1, Integer.MAX_VALUE,
+        DEFAULT_ACCESS_KEY_AUTH_TIME_DIFF_TOLERANCE);
   }
 
   public int releaseMessageCacheScanInterval() {

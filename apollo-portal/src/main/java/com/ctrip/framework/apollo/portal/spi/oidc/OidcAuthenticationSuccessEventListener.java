@@ -1,6 +1,23 @@
+/*
+ * Copyright 2022 Apollo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package com.ctrip.framework.apollo.portal.spi.oidc;
 
 import com.ctrip.framework.apollo.portal.entity.bo.UserInfo;
+import com.ctrip.framework.apollo.portal.spi.configuration.OidcExtendProperties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
@@ -21,11 +38,14 @@ public class OidcAuthenticationSuccessEventListener implements
 
   private final OidcLocalUserService oidcLocalUserService;
 
+  private final OidcExtendProperties oidcExtendProperties;
+
   private final ConcurrentMap<String, String> userIdCache = new ConcurrentHashMap<>();
 
   public OidcAuthenticationSuccessEventListener(
-      OidcLocalUserService oidcLocalUserService) {
+      OidcLocalUserService oidcLocalUserService, OidcExtendProperties oidcExtendProperties) {
     this.oidcLocalUserService = oidcLocalUserService;
+    this.oidcExtendProperties = oidcExtendProperties;
   }
 
   @Override
@@ -43,13 +63,15 @@ public class OidcAuthenticationSuccessEventListener implements
   }
 
   private void oidcUserLogin(OidcUser oidcUser) {
-    if (this.contains(oidcUser.getSubject())) {
-      return;
-    }
     UserInfo newUserInfo = new UserInfo();
     newUserInfo.setUserId(oidcUser.getSubject());
-    newUserInfo.setName(oidcUser.getPreferredUsername());
+    newUserInfo.setName(
+        OidcUserInfoUtil.getOidcUserDisplayName(oidcUser, this.oidcExtendProperties));
     newUserInfo.setEmail(oidcUser.getEmail());
+    if (this.contains(oidcUser.getSubject())) {
+      this.oidcLocalUserService.updateUserInfo(newUserInfo);
+      return;
+    }
     this.oidcLocalUserService.createLocalUser(newUserInfo);
   }
 
@@ -71,6 +93,7 @@ public class OidcAuthenticationSuccessEventListener implements
     }
     UserInfo newUserInfo = new UserInfo();
     newUserInfo.setUserId(jwt.getSubject());
+    newUserInfo.setName(OidcUserInfoUtil.getJwtUserDisplayName(jwt, this.oidcExtendProperties));
     this.oidcLocalUserService.createLocalUser(newUserInfo);
   }
 }
